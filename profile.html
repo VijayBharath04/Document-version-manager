@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>User Profile | Document Version Manager</title>
+  
+  <!-- CSS Dependencies -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div class="app-layout">
+    <!-- LEFT SIDEBAR -->
+    <aside class="app-sidebar">
+      <div class="sidebar-brand">
+        <div class="auth-brand-icon" style="width: 36px; height: 36px; font-size: 1.1rem;">
+          <i class="fa-solid fa-code-branch"></i>
+        </div>
+        <span class="brand-font fs-6 text-dark">Doc Version Mgr</span>
+      </div>
+
+      <div class="sidebar-menu">
+        <div class="sidebar-category">Main Menu</div>
+        <a href="dashboard.html" class="nav-link-custom">
+          <i class="fa-solid fa-house"></i>
+          <span>Dashboard</span>
+        </a>
+        <a href="dashboard.html#documentsSection" class="nav-link-custom">
+          <i class="fa-solid fa-folder-open"></i>
+          <span>My Documents</span>
+        </a>
+        <a href="upload.html" class="nav-link-custom">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+          <span>Upload Document</span>
+        </a>
+        <a href="versions.html" class="nav-link-custom">
+          <i class="fa-solid fa-timeline"></i>
+          <span>Version History</span>
+        </a>
+        <a href="compare.html" class="nav-link-custom">
+          <i class="fa-solid fa-code-compare"></i>
+          <span>Compare Versions</span>
+        </a>
+        <a href="notifications.html" class="nav-link-custom">
+          <i class="fa-solid fa-bell"></i>
+          <span>Notifications</span>
+        </a>
+        <a href="profile.html" class="nav-link-custom active">
+          <i class="fa-solid fa-user-gear"></i>
+          <span>Profile</span>
+        </a>
+
+        <div class="sidebar-category mt-3">Administration</div>
+        <a href="admin.html" class="nav-link-custom">
+          <i class="fa-solid fa-shield-halved"></i>
+          <span>Admin Dashboard</span>
+        </a>
+      </div>
+
+      <div class="sidebar-footer">
+        <button class="btn btn-secondary-soft w-100 justify-content-start" onclick="DVM.logout()">
+          <i class="fa-solid fa-arrow-right-from-bracket text-danger"></i>
+          <span>Logout</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="app-main">
+      <header class="app-topbar">
+        <div class="d-flex align-items-center gap-3">
+          <button id="sidebarToggle" class="btn btn-sm btn-secondary-soft d-lg-none">
+            <i class="fa-solid fa-bars"></i>
+          </button>
+          <span class="text-muted small">
+            <a href="dashboard.html" class="text-decoration-none text-muted">Home</a> / My Profile
+          </span>
+        </div>
+
+        <div class="topbar-right">
+          <div class="avatar-initials">DK</div>
+          <span class="fw-bold text-dark small dynamic-user-name">Dinesh Kumar R</span>
+        </div>
+      </header>
+
+      <div class="page-content">
+        <div class="max-w-900 mx-auto" style="max-width: 860px;">
+          <!-- Profile Heading -->
+          <div class="mb-4">
+            <h1 class="h3 fw-bold text-dark mb-1">My Profile</h1>
+            <p class="text-muted mb-0">Manage your credentials, SCM project attribution, and account security.</p>
+          </div>
+
+          <!-- Profile Card -->
+          <div class="card-modern p-4 mb-4">
+            <div class="d-flex flex-column flex-sm-row align-items-sm-center gap-4 pb-4 border-bottom">
+              <div class="avatar-initials" style="width: 72px; height: 72px; font-size: 1.75rem;">
+                DK
+              </div>
+              <div class="flex-grow-1">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                  <h2 class="h4 fw-bold text-dark mb-0" id="profileName">Dinesh Kumar R</h2>
+                  <span class="badge-status-active">
+                    <i class="fa-solid fa-shield-check" style="font-size: 8px;"></i> Account verified
+                  </span>
+                </div>
+                <div class="text-muted small" id="profileCollege">
+                  College of Engineering • Software Configuration Management Project
+                </div>
+              </div>
+              <div>
+                <button class="btn btn-sm btn-primary" id="openEditProfileBtn">
+                  <i class="fa-solid fa-user-pen me-1"></i> Edit Profile
+                </button>
+              </div>
+            </div>
+
+            <!-- Profile Info Grid -->
+            <div class="row g-3 pt-4">
+              <div class="col-sm-6">
+                <div class="p-3 bg-light rounded border">
+                  <div class="text-muted small fw-semibold text-uppercase">Full Name</div>
+                  <div class="fw-bold text-dark fs-6 mt-1" id="gridProfileName">Dinesh Kumar R</div>
+                </div>
+              </div>
+
+              <div class="col-sm-6">
+                <div class="p-3 bg-light rounded border">
+                  <div class="text-muted small fw-semibold text-uppercase">Mobile Number</div>
+                  <div class="fw-bold text-dark fs-6 mt-1 font-monospace" id="gridProfileMobile">+91 XXXXXXXX10</div>
+                </div>
+              </div>
+
+              <div class="col-sm-6">
+                <div class="p-3 bg-light rounded border">
+                  <div class="text-muted small fw-semibold text-uppercase">User Role</div>
+                  <div class="fw-bold text-dark fs-6 mt-1" id="gridProfileRole">User</div>
+                </div>
+              </div>
+
+              <div class="col-sm-6">
+                <div class="p-3 bg-light rounded border">
+                  <div class="text-muted small fw-semibold text-uppercase">Account Status</div>
+                  <div class="fw-bold text-success fs-6 mt-1">
+                    <i class="fa-solid fa-circle-check me-1"></i> Active
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-sm-6">
+                <div class="p-3 bg-light rounded border">
+                  <div class="text-muted small fw-semibold text-uppercase">Course / Subject</div>
+                  <div class="fw-bold text-dark fs-6 mt-1">Software Configuration Management (SCM)</div>
+                </div>
+              </div>
+
+              <div class="col-sm-6">
+                <div class="p-3 bg-light rounded border">
+                  <div class="text-muted small fw-semibold text-uppercase">Academic Year</div>
+                  <div class="fw-bold text-dark fs-6 mt-1">2026 Academic Term</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-flex flex-wrap gap-3 pt-4 mt-3 border-top">
+              <button class="btn btn-outline-primary" id="openChangeMobileBtn">
+                <i class="fa-solid fa-mobile-screen me-1"></i> Change Mobile Number
+              </button>
+              <button class="btn btn-secondary-soft text-danger" onclick="DVM.logout()">
+                <i class="fa-solid fa-arrow-right-from-bracket me-1"></i> Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- EDIT PROFILE MODAL -->
+  <div class="modal-overlay" id="editProfileModal">
+    <div class="modal-content-card">
+      <div class="modal-header-custom">
+        <h5 class="fw-bold text-dark mb-0">Edit Profile Information</h5>
+        <button class="btn btn-sm btn-link text-muted" onclick="document.getElementById('editProfileModal').classList.remove('is-active')">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <form id="editProfileForm">
+        <div class="modal-body-custom">
+          <div class="mb-3">
+            <label for="editNameInput" class="form-label small fw-bold text-dark">Full Name</label>
+            <input type="text" class="form-control" id="editNameInput" required>
+          </div>
+          <div class="mb-3">
+            <label for="editEmailInput" class="form-label small fw-bold text-dark">Email Address</label>
+            <input type="email" class="form-control" id="editEmailInput" required>
+          </div>
+        </div>
+        <div class="modal-footer-custom">
+          <button type="button" class="btn btn-secondary-soft btn-sm" onclick="document.getElementById('editProfileModal').classList.remove('is-active')">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- CHANGE MOBILE MODAL -->
+  <div class="modal-overlay" id="changeMobileModal">
+    <div class="modal-content-card">
+      <div class="modal-header-custom">
+        <h5 class="fw-bold text-dark mb-0">Change Mobile Number</h5>
+        <button class="btn btn-sm btn-link text-muted" onclick="document.getElementById('changeMobileModal').classList.remove('is-active')">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <form id="changeMobileForm">
+        <div class="modal-body-custom">
+          <p class="text-muted small mb-3">
+            Changing your mobile number will require re-verifying with an OTP.
+          </p>
+          <div class="mb-3">
+            <label for="newMobileInput" class="form-label small fw-bold text-dark">New 10-Digit Mobile Number</label>
+            <div class="phone-input-group">
+              <span class="phone-prefix">+91</span>
+              <input type="tel" id="newMobileInput" class="phone-input" placeholder="e.g. 9876543210" maxlength="10" required>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer-custom">
+          <button type="button" class="btn btn-secondary-soft btn-sm" onclick="document.getElementById('changeMobileModal').classList.remove('is-active')">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm">Proceed to Verify OTP</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+      DVM.checkAuth(true);
+
+      const user = DVM.getUser();
+      const pName = document.getElementById('profileName');
+      const gName = document.getElementById('gridProfileName');
+      const gMobile = document.getElementById('gridProfileMobile');
+      const gRole = document.getElementById('gridProfileRole');
+
+      if (pName) pName.textContent = user.name || user.full_name;
+      if (gName) gName.textContent = user.name || user.full_name;
+      if (gRole) gRole.textContent = user.role || 'User';
+
+      if (gMobile && user.mobile) {
+        const digits = user.mobile.replace(/\D/g, '');
+        const last2 = digits.slice(-2);
+        gMobile.textContent = `+91 XXXXXXXX${last2}`;
+      }
+
+      // Edit Profile Modal handlers
+      const editModal = document.getElementById('editProfileModal');
+      const openEditBtn = document.getElementById('openEditProfileBtn');
+      const editForm = document.getElementById('editProfileForm');
+      const editNameInput = document.getElementById('editNameInput');
+      const editEmailInput = document.getElementById('editEmailInput');
+
+      if (openEditBtn && editModal) {
+        openEditBtn.addEventListener('click', () => {
+          if (editNameInput) editNameInput.value = user.name || user.full_name;
+          if (editEmailInput) editEmailInput.value = user.email || 'dinesh.kumar@college.edu';
+          editModal.classList.add('is-active');
+        });
+      }
+
+      if (editForm) {
+        editForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const updated = await DVM.updateUser({
+            name: editNameInput.value.trim(),
+            full_name: editNameInput.value.trim(),
+            email: editEmailInput.value.trim()
+          });
+          DVM.showToast('Profile Updated', 'Your profile details have been saved to the database.', 'success');
+          editModal.classList.remove('is-active');
+          if (pName) pName.textContent = updated.name;
+          if (gName) gName.textContent = updated.name;
+          document.querySelectorAll('.dynamic-user-name').forEach(el => el.textContent = updated.name);
+        });
+      }
+
+      // Change Mobile Modal handlers
+      const mobileModal = document.getElementById('changeMobileModal');
+      const openMobileBtn = document.getElementById('openChangeMobileBtn');
+      const mobileForm = document.getElementById('changeMobileForm');
+      const newMobileInput = document.getElementById('newMobileInput');
+
+      if (openMobileBtn && mobileModal) {
+        openMobileBtn.addEventListener('click', () => {
+          mobileModal.classList.add('is-active');
+        });
+      }
+
+      if (mobileForm) {
+        mobileForm.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          const val = newMobileInput.value.trim();
+          if (/^[6-9]\d{9}$/.test(val)) {
+            try {
+              if (window.DVM_AUTH) {
+                await DVM_AUTH.sendOtp(val);
+              }
+              localStorage.setItem('dvm_temp_mobile', val);
+              mobileModal.classList.remove('is-active');
+              window.location.href = 'otp.html';
+            } catch (err) {
+              DVM.showToast('Error', err.message || 'Failed to dispatch verification code.', 'danger');
+            }
+          } else {
+            DVM.showToast('Validation Error', 'Please enter a valid 10-digit Indian mobile number.', 'warning');
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>

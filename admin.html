@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Dashboard | Document Version Manager</title>
+  
+  <!-- CSS Dependencies -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div class="app-layout">
+    <!-- LEFT SIDEBAR -->
+    <aside class="app-sidebar">
+      <div class="sidebar-brand">
+        <div class="auth-brand-icon" style="width: 36px; height: 36px; font-size: 1.1rem;">
+          <i class="fa-solid fa-code-branch"></i>
+        </div>
+        <span class="brand-font fs-6 text-dark">Doc Version Mgr</span>
+      </div>
+
+      <div class="sidebar-menu">
+        <div class="sidebar-category">Main Menu</div>
+        <a href="dashboard.html" class="nav-link-custom">
+          <i class="fa-solid fa-house"></i>
+          <span>Dashboard</span>
+        </a>
+        <a href="dashboard.html#documentsSection" class="nav-link-custom">
+          <i class="fa-solid fa-folder-open"></i>
+          <span>My Documents</span>
+        </a>
+        <a href="upload.html" class="nav-link-custom">
+          <i class="fa-solid fa-cloud-arrow-up"></i>
+          <span>Upload Document</span>
+        </a>
+        <a href="versions.html" class="nav-link-custom">
+          <i class="fa-solid fa-timeline"></i>
+          <span>Version History</span>
+        </a>
+        <a href="compare.html" class="nav-link-custom">
+          <i class="fa-solid fa-code-compare"></i>
+          <span>Compare Versions</span>
+        </a>
+        <a href="notifications.html" class="nav-link-custom">
+          <i class="fa-solid fa-bell"></i>
+          <span>Notifications</span>
+        </a>
+        <a href="profile.html" class="nav-link-custom">
+          <i class="fa-solid fa-user-gear"></i>
+          <span>Profile</span>
+        </a>
+
+        <div class="sidebar-category mt-3">Administration</div>
+        <a href="admin.html" class="nav-link-custom active">
+          <i class="fa-solid fa-shield-halved"></i>
+          <span>Admin Dashboard</span>
+        </a>
+      </div>
+
+      <div class="sidebar-footer">
+        <button class="btn btn-secondary-soft w-100 justify-content-start" onclick="DVM.logout()">
+          <i class="fa-solid fa-arrow-right-from-bracket text-danger"></i>
+          <span>Logout</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- MAIN CONTENT -->
+    <main class="app-main">
+      <header class="app-topbar">
+        <div class="d-flex align-items-center gap-3">
+          <button id="sidebarToggle" class="btn btn-sm btn-secondary-soft d-lg-none">
+            <i class="fa-solid fa-bars"></i>
+          </button>
+          <span class="text-muted small">
+            <a href="dashboard.html" class="text-decoration-none text-muted">Home</a> / Admin Dashboard
+          </span>
+        </div>
+
+        <div class="topbar-right">
+          <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-3 py-2 fw-semibold">
+            <i class="fa-solid fa-lock me-1"></i> Admin Privileges
+          </span>
+          <div class="avatar-initials">DK</div>
+        </div>
+      </header>
+
+      <div class="page-content">
+        <!-- Heading -->
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-4">
+          <div>
+            <h1 class="h3 fw-bold text-dark mb-1">Admin Dashboard</h1>
+            <p class="text-muted mb-0">System-wide software configuration monitoring, user access governance, and audit trails.</p>
+          </div>
+          <span class="badge bg-light text-secondary border px-3 py-2">
+            <i class="fa-solid fa-circle-check text-success me-1"></i> Repository Health: 100%
+          </span>
+        </div>
+
+        <!-- 4 ADMIN METRIC CARDS -->
+        <div class="row g-3 mb-4">
+          <div class="col-sm-6 col-xl-3">
+            <div class="metric-card">
+              <div>
+                <div class="metric-title">Total Users</div>
+                <div class="metric-value">125</div>
+                <div class="text-muted small mt-1">
+                  <span class="text-success"><i class="fa-solid fa-arrow-up"></i> +12 this term</span>
+                </div>
+              </div>
+              <div class="metric-icon-box bg-primary-subtle text-primary">
+                <i class="fa-solid fa-users"></i>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-sm-6 col-xl-3">
+            <div class="metric-card">
+              <div>
+                <div class="metric-title">Total Documents</div>
+                <div class="metric-value">1,284</div>
+                <div class="text-muted small mt-1">
+                  <span class="text-primary">Across 32 projects</span>
+                </div>
+              </div>
+              <div class="metric-icon-box bg-success-subtle text-success">
+                <i class="fa-solid fa-folder-tree"></i>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-sm-6 col-xl-3">
+            <div class="metric-card">
+              <div>
+                <div class="metric-title">Total Versions</div>
+                <div class="metric-value">4,823</div>
+                <div class="text-muted small mt-1">
+                  <span class="text-info">~3.7 avg per doc</span>
+                </div>
+              </div>
+              <div class="metric-icon-box bg-warning-subtle text-warning">
+                <i class="fa-solid fa-code-commit"></i>
+              </div>
+            </div>
+          </div>
+
+          <div class="col-sm-6 col-xl-3">
+            <div class="metric-card">
+              <div>
+                <div class="metric-title">Storage Used</div>
+                <div class="metric-value">86 GB</div>
+                <div class="text-muted small mt-1">
+                  <span class="text-secondary">57% of 150 GB tier</span>
+                </div>
+              </div>
+              <div class="metric-icon-box bg-info-subtle text-info">
+                <i class="fa-solid fa-server"></i>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="row g-4 mb-4">
+          <!-- User Management Table -->
+          <div class="col-lg-8">
+            <div class="card-modern p-4 h-100">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                  <h2 class="h5 fw-bold text-dark mb-0">User Management</h2>
+                  <p class="text-muted small mb-0">Manage authorized college contributors and permissions.</p>
+                </div>
+                <span class="badge bg-light text-muted">6 Users Listed</span>
+              </div>
+
+              <div class="table-responsive">
+                <table class="table-custom">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Mobile</th>
+                      <th>Role</th>
+                      <th>Docs</th>
+                      <th>Status</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminUsersTableBody">
+                    <!-- Populated by admin.js -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <!-- Storage Monitoring Breakdown -->
+          <div class="col-lg-4">
+            <div class="card-modern p-4 h-100">
+              <h2 class="h5 fw-bold text-dark mb-1">Storage Monitoring</h2>
+              <p class="text-muted small mb-3">Repository disk consumption by document format.</p>
+
+              <div class="mb-3">
+                <div class="d-flex justify-content-between small fw-bold mb-1">
+                  <span><i class="fa-solid fa-file-pdf text-danger me-1"></i> PDF Reports</span>
+                  <span>42% (36.1 GB)</span>
+                </div>
+                <div class="progress" style="height: 8px;">
+                  <div class="progress-bar bg-danger" style="width: 42%;"></div>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <div class="d-flex justify-content-between small fw-bold mb-1">
+                  <span><i class="fa-solid fa-file-word text-primary me-1"></i> DOCX Specifications</span>
+                  <span>28% (24.0 GB)</span>
+                </div>
+                <div class="progress" style="height: 8px;">
+                  <div class="progress-bar bg-primary" style="width: 28%;"></div>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <div class="d-flex justify-content-between small fw-bold mb-1">
+                  <span><i class="fa-solid fa-file-powerpoint text-warning me-1"></i> PPTX Presentations</span>
+                  <span>18% (15.5 GB)</span>
+                </div>
+                <div class="progress" style="height: 8px;">
+                  <div class="progress-bar bg-warning" style="width: 18%;"></div>
+                </div>
+              </div>
+
+              <div class="mb-4">
+                <div class="d-flex justify-content-between small fw-bold mb-1">
+                  <span><i class="fa-solid fa-file-code text-secondary me-1"></i> TXT & Other</span>
+                  <span>12% (10.4 GB)</span>
+                </div>
+                <div class="progress" style="height: 8px;">
+                  <div class="progress-bar bg-secondary" style="width: 12%;"></div>
+                </div>
+              </div>
+
+              <div class="p-3 bg-light rounded border small">
+                <div class="fw-bold text-dark mb-1"><i class="fa-solid fa-cloud-arrow-up text-primary me-1"></i> SCM Deduplication</div>
+                <div class="text-muted">Differential delta storage saves approximately 64% bandwidth across version commits.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Global Activity Log -->
+        <div class="card-modern p-4">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <h2 class="h5 fw-bold text-dark mb-0">System Activity Audit Log</h2>
+              <p class="text-muted small mb-0">Full cryptographic audit trail of all repository configuration actions.</p>
+            </div>
+            <button class="btn btn-sm btn-secondary-soft" onclick="DVM.showToast('Audit Export', 'Exporting audit log CSV...', 'info')">
+              <i class="fa-solid fa-download me-1"></i> Export Audit Log
+            </button>
+          </div>
+
+          <div class="table-responsive">
+            <table class="table-custom">
+              <thead>
+                <tr>
+                  <th>User</th>
+                  <th>Action</th>
+                  <th>Document</th>
+                  <th>Version</th>
+                  <th>Timestamp</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="adminActivityTableBody">
+                <!-- Populated by admin.js -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- ADMIN USER DETAIL MODAL -->
+  <div class="modal-overlay" id="adminUserDetailModal">
+    <div class="modal-content-card">
+      <div class="modal-header-custom">
+        <h5 class="fw-bold text-dark mb-0">User Account Details</h5>
+        <button class="btn btn-sm btn-link text-muted" id="closeAdminUserModalBtn">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="modal-body-custom">
+        <div class="d-flex align-items-center gap-3 mb-4 pb-3 border-bottom">
+          <div class="avatar-initials" style="width: 50px; height: 50px; font-size: 1.2rem;">
+            US
+          </div>
+          <div>
+            <h5 class="fw-bold text-dark mb-0" id="adminModalUserName">User Name</h5>
+            <span class="badge bg-light text-muted border mt-1" id="adminModalUserRole">Role</span>
+          </div>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-6">
+            <div class="small text-muted">Mobile Number</div>
+            <div class="fw-bold text-dark font-monospace" id="adminModalUserMobile">+91 9876543210</div>
+          </div>
+          <div class="col-6">
+            <div class="small text-muted">Account Status</div>
+            <div class="fw-bold text-dark" id="adminModalUserStatus">Active</div>
+          </div>
+          <div class="col-12">
+            <div class="small text-muted">Access Level</div>
+            <div class="fw-medium text-dark">SCM Document Contributor & Baseline Reviewer</div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer-custom">
+        <button class="btn btn-secondary-soft btn-sm" onclick="document.getElementById('adminUserDetailModal').classList.remove('is-active')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/auth.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/admin.js"></script>
+</body>
+</html>
