@@ -10,14 +10,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (banner) banner.style.display = 'block';
   }
 
-  // Pre-initialize Auth provider
-  if (window.DVM_AUTH) {
-    try {
-      await DVM_AUTH.init();
-      DVM_AUTH.initRecaptcha('recaptcha-container');
-    } catch (_) {}
-  }
-
   const loginForm = document.getElementById('loginForm');
   const mobileInput = document.getElementById('mobileInput');
   const mobileError = document.getElementById('mobileError');

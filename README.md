@@ -24,8 +24,8 @@ The user interface follows a modern SaaS dashboard aesthetic (clean white cards,
 - **SaaS Landing Page (`index.html`)**: Product hero, SCM feature cards, architecture overview, and quick links.
 - **Secure Authentication UI (`login.html` & `otp.html`)**:
   - Validates 10-digit Indian mobile numbers (`+91`).
-  - 6-digit OTP verification with automatic input tabbing, paste handling, and 30-second resend timer.
-  - **Demo Mode OTP:** `123456`.
+  - 6-digit OTP verification with automatic input tabbing, paste handling, and 60-second resend cooldown.
+  - **Real SMS OTP** delivered via Supabase Phone Auth (see *Backend Setup* below). The code is never displayed in the UI, returned by the API, or written to the browser console.
 - **Main SaaS Dashboard (`dashboard.html`)**:
   - 4 Summary metric cards: Total Documents, Total Versions, Storage Used, Recent Updates.
   - Interactive documents table with category filters (All, PDF, DOCX, TXT, PPT/Images, Archived).
@@ -71,8 +71,11 @@ The user interface follows a modern SaaS dashboard aesthetic (clean white cards,
 - **JavaScript (ES6+)**: Modular scripts, DOM manipulation, line-by-line diffing algorithm, client-side storage orchestration.
 - **Bootstrap 5 (CDN)**: Grid layout and utility classes.
 - **Font Awesome 6 (CDN)**: Modern icons for documents, versions, and navigation.
-- **Web Storage API (`localStorage`)**: Persistent client-side data store pre-populated with realistic multi-version documents.
-- **Netlify**: Static website hosting with automated git-based continuous deployment.
+- **Web Storage API (`localStorage`)**: Persistent client-side cache pre-populated with realistic multi-version documents.
+- **Node.js + Express**: Backend API (`server/`) providing authentication, rate limiting, and document/version/notification/activity routes.
+- **SQLite (`better-sqlite3`)**: Local application database for profiles, documents, versions, notifications, activities, and OTP state.
+- **Supabase (Phone Auth + PostgreSQL)**: Real SMS OTP delivery/verification and a `profiles` table protected by Row Level Security.
+- **Netlify**: Static website hosting with automated git-based continuous deployment (API served via a Netlify function).
 
 ---
 
@@ -83,7 +86,7 @@ document-version-manager/
 │
 ├── index.html            # Landing page (hero, feature cards, SCM highlights, footer)
 ├── login.html            # Full-screen login card with Indian mobile validation (+91)
-├── otp.html              # 6-box OTP input with 30s timer & demo credentials
+├── otp.html              # 6-box OTP input with 60s resend cooldown
 ├── dashboard.html        # Main dashboard with 4 metric cards, document table & activity
 ├── upload.html           # Drag & drop upload area with progress bar & version fields
 ├── versions.html         # Document baseline timeline, content preview & safe restore
@@ -96,6 +99,7 @@ document-version-manager/
 │   └── style.css         # Modern SaaS CSS design system & responsive rules
 │
 ├── js/
+│   ├── auth.js           # Auth client: send/verify OTP, session restore & refresh
 │   ├── app.js            # Shared engine: localStorage data seed, auth guard, toast system
 │   ├── login.js          # Mobile validation & session redirection
 │   ├── otp.js            # 6-box keyboard navigation, timer & verification logic
@@ -105,11 +109,27 @@ document-version-manager/
 │   ├── compare.js        # Line-by-line diffing algorithm & change statistics
 │   └── admin.js          # Admin user management & storage monitoring
 │
+├── server/
+│   ├── server.js         # Express API: auth, profile, documents, versions, notifications
+│   ├── supabase-auth.js  # Supabase Phone Auth (send/verify/refresh) + profile upsert
+│   ├── sms.js            # Custom SMS gateways (Fast2SMS / Twilio / 2Factor)
+│   └── db.js             # SQLite data layer (profiles, docs, versions, OTP state)
+│
+├── database/
+│   └── supabase_schema.sql  # Supabase PostgreSQL schema, RLS policies & triggers
+│
+├── tests/
+│   └── test-auth-and-db.js  # Integration tests (auth, API, DB, security)
+│
+├── netlify/
+│   └── functions/api.js  # Netlify serverless wrapper for the Express API
+│
 ├── assets/
 │   ├── images/           # Brand graphics and illustrations
 │   └── icons/            # Document icons
 │
-├── netlify.toml          # Netlify static deployment and security configuration
+├── .env.example          # Environment variable template (copy to .env)
+├── netlify.toml          # Netlify deployment, API redirect & security headers
 ├── .gitignore            # Git ignore file for editor and temporary files
 └── README.md             # Project documentation
 ```
@@ -118,16 +138,66 @@ document-version-manager/
 
 ## 🚀 How to Run Locally
 
-### Option 1: VS Code Live Server (Recommended)
-1. Open Visual Studio Code.
-2. Open the `document-version-manager` folder:
-   - `File` > `Open Folder...` > Select `document-version-manager`.
-3. If you have the **Live Server** extension installed:
-   - Right-click `index.html` and click **"Open with Live Server"**.
-4. The website will open in your default browser at `http://127.0.0.1:5500/index.html`.
+The frontend is static, but authentication and data now run through the Express API,
+so start the backend (which also serves the frontend) for the full experience.
 
-### Option 2: Direct Browser Launch
-Because this project uses 100% static HTML, CSS, and vanilla JavaScript without any node build step, you can also double-click `index.html` to run it directly in any modern browser (Chrome, Edge, Firefox, Safari).
+### Setup
+```bash
+npm install
+copy .env.example .env      # Windows  (use: cp .env.example .env on macOS/Linux)
+# then edit .env and add your Supabase / SMS provider credentials
+npm start                   # starts the server on http://localhost:3000
+```
+
+Open **http://localhost:3000** in your browser.
+
+> Without SMS provider credentials the server runs in a clearly-labelled
+> **development fallback**: no SMS is actually sent and the code is printed only
+> in the server terminal. In `NODE_ENV=production` the server refuses to simulate
+> and returns an error until real credentials are configured.
+
+### Static-only preview (landing pages only)
+1. Open the project folder in Visual Studio Code.
+2. Right-click `index.html` and choose **"Open with Live Server"** (`http://127.0.0.1:5500`).
+   *(OTP login will not work in this mode because the API is not running.)*
+
+---
+
+## 🔐 Backend Setup (Real SMS OTP + Supabase)
+
+### 1. Create the Supabase project
+1. Sign up at [https://supabase.com](https://supabase.com) (free tier, no card required).
+2. **New project** → choose a name, database password, and region.
+3. **Project Settings → API** → copy the **Project URL**, **anon public key**, and **service_role key**.
+4. Paste them into `.env`:
+   ```
+   SUPABASE_URL=https://<your-project-ref>.supabase.co
+   SUPABASE_ANON_KEY=<anon public key>
+   SUPABASE_SERVICE_ROLE_KEY=<service_role key>   # SERVER ONLY — never expose
+   ```
+   Also set a strong `JWT_SECRET` (32+ random characters).
+
+### 2. Create the database schema
+1. In Supabase, open **SQL Editor**.
+2. Paste the entire contents of `database/supabase_schema.sql` and run it.
+   This creates the `profiles` table (+ documents/versions/notifications/activities),
+   Row Level Security policies, a profile auto-creation trigger, and an `updated_at` trigger.
+
+### 3. Enable a real SMS provider (required for physical delivery)
+1. In Supabase, go to **Authentication → Providers → Phone** and enable it.
+2. Choose a provider and enter its credentials:
+   - **Twilio** (global; free trial credit, card/phone verification required).
+   - **MessageBird / Vonage / TextLocal** (other supported providers).
+   > SMS is **not** free or unlimited. A payment method, credits, and possibly
+   > sender/DLT registration are typically required for delivery to Indian numbers.
+3. Save the provider settings in Supabase.
+
+### Alternative: SMS providers configured directly in `.env`
+If you prefer not to configure a provider inside Supabase, you can use one of these
+instead (used when Supabase Phone Auth is unavailable):
+- `FAST2SMS_API_KEY` — India, free signup at [https://www.fast2sms.com](https://www.fast2sms.com).
+- `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE_NUMBER` — global, $15 trial credit.
+- `TWO_FACTOR_API_KEY` — India, [https://2factor.in](https://2factor.in).
 
 ---
 
@@ -135,34 +205,29 @@ Because this project uses 100% static HTML, CSS, and vanilla JavaScript without 
 
 ### Step 1: Push to GitHub
 ```bash
-git init
 git add .
-git commit -m "feat: initial commit for Document Version Manager"
-git branch -M main
-git remote add origin https://github.com/dinesh16122006-gif/Document-version-Manager.git
-git push -u origin main
+git commit -m "feat: real SMS OTP + Supabase backend"
+git push
 ```
 
-### Step 2: Deploy to Netlify
-1. Log in to [Netlify](https://www.netlify.com/).
-2. Click **"Add new site"** > **"Import an existing project"**.
-3. Choose **GitHub** and authorize access.
-4. Select the repository: `dinesh16122006-gif/Document-version-Manager`.
-5. Configuration settings:
-   - **Branch to deploy**: `main`
-   - **Build command**: *(Leave blank, no build command needed)*
-   - **Publish directory**: `.`
-6. Click **"Deploy site"**.
-7. Netlify will build and provide a live URL (e.g. `https://your-site-name.netlify.app`).
+### Step 2: Configure & deploy on Netlify
+1. Log in to [Netlify](https://www.netlify.com/) and select the repository.
+2. **Build command**: *(leave blank)* — **Publish directory**: `.`
+3. Add the environment variables from your `.env` under
+   **Site configuration → Environment variables** (`SUPABASE_URL`, `SUPABASE_ANON_KEY`,
+   `SUPABASE_SERVICE_ROLE_KEY`, `JWT_SECRET`, `NODE_ENV=production`, and any SMS keys).
+4. Deploy. The `/api/*` routes are served by `netlify/functions/api.js`.
 
 ---
 
-## 🔑 Demo Login Credentials
+## 🔑 Signing In
 
-For demonstration and grading evaluation:
-- **Mobile Number**: Any valid 10-digit Indian number (e.g. `9876543210`)
-- **Demo OTP**: `123456`
-- **Authenticated User**: Dinesh Kumar R
+- **Mobile Number**: any valid 10-digit Indian number (e.g. `9876543210`).
+- **OTP**: the 6-digit code actually texted to that phone. There is **no demo code** —
+  a verified new number creates an account, and a returning verified number logs in.
+
+> A real SMS can only be received after a provider is configured (step 3 above).
+> Until then, the development fallback prints the code **in the server terminal only**.
 
 ---
 
@@ -172,7 +237,8 @@ For demonstration and grading evaluation:
 |---|---|---|
 | **Mobile Validation** | Enter `12345` or letters | Displays: *"Please enter a valid 10-digit mobile number."* |
 | **Valid Login** | Enter `9876543210` | Proceeds to `otp.html` with masked number `+91 ******3210`. |
-| **OTP Auto-tabbing** | Type digits or paste `123456` | Advances automatically across boxes and triggers verification. |
+| **OTP Auto-tabbing** | Type or paste the 6-digit SMS code | Advances automatically across boxes and triggers verification. |
+| **Incorrect OTP** | Enter a wrong 6-digit code | Displays an error; the account is not authenticated. |
 | **Dashboard Metrics** | Open `dashboard.html` | Displays Total Docs (8+), Total Versions, Storage (2.4 GB). |
 | **Search & Filter** | Type "Report" or click "PDF" tab | Instantly filters the table; displays empty state if no match. |
 | **Upload Flow** | Drag a file, enter version and description | Shows progress bar and redirects to updated version timeline. |

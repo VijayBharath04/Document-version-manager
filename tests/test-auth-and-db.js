@@ -64,6 +64,8 @@ async function runTests() {
     const testTimestamp = Date.now().toString().slice(-8);
     const realTestPhone = '+9197' + testTimestamp;
     let realOtpGenerated = '';
+    let testToken = '';
+    let testUserId = '';
 
     await test('POST /api/auth/send-otp validates mobile and dispatches OTP', async () => {
       const res = await fetch(`${BASE_URL}/api/auth/send-otp`, {
@@ -76,12 +78,21 @@ async function runTests() {
       assert.strictEqual(data.success, true);
       assert.strictEqual(data.phone, realTestPhone);
       assert.ok(data.message);
-      // Grab code for test verification from DB
+      // SECURITY: the OTP must never be present in the API response
+      assert.strictEqual(data.code, undefined);
+      assert.strictEqual(data.otp, undefined);
+      assert.strictEqual(data.devCode, undefined);
+      // Grab the code from the SERVER-SIDE database only (never from the API)
       const { otpDAO } = require('../server/db');
       const rec = otpDAO.findLatestPending(realTestPhone);
       assert.ok(rec, 'OTP record must exist in database');
       assert.strictEqual(rec.phone_number, realTestPhone);
       realOtpGenerated = rec.code;
+      // The 6-digit code must not leak anywhere in the serialized response
+      assert.ok(
+        !JSON.stringify(data).includes(realOtpGenerated),
+        'OTP code must not appear anywhere in the API response'
+      );
     })();
 
     await test('POST /api/auth/verify-otp rejects incorrect OTP code', async () => {
@@ -114,50 +125,47 @@ async function runTests() {
       assert.strictEqual(data.success, true);
       assert.ok(data.token, 'Must return signed session token');
       assert.strictEqual(data.user.phone_number, realTestPhone);
-    })();
-
-    // 3. User Registration via Session Endpoint (New User Flow)
-    const testPhone = '+9198' + testTimestamp;
-    const testUid = 'test-uid-' + testTimestamp;
-    let testToken = '';
-    let testUserId = '';
-
-    await test('POST /api/auth/session creates account and profile for new user', async () => {
-      const res = await fetch(`${BASE_URL}/api/auth/session`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: testPhone,
-          uid: testUid,
-          name: 'Dinesh Kumar R'
-        })
-      });
-      assert.strictEqual(res.status, 200);
-      const data = await res.json();
-      assert.strictEqual(data.success, true);
-      assert.ok(data.token, 'Token must be provided');
-      assert.strictEqual(data.user.phone_number, testPhone);
-      assert.strictEqual(data.user.full_name, 'Dinesh Kumar R');
+      // SECURITY: OTP never echoed back
+      assert.ok(!JSON.stringify(data).includes(realOtpGenerated));
       testToken = data.token;
       testUserId = data.user.id;
     })();
 
-    // 4. Duplicate Prevention (Existing User Login Flow)
-    await test('POST /api/auth/session returns existing profile without duplicate accounts', async () => {
-      const res = await fetch(`${BASE_URL}/api/auth/session`, {
+    // 2c. Duplicate prevention: a returning user logs into the SAME profile
+    await test('Repeat verified login for same phone returns same profile (no duplicates)', async () => {
+      const sendRes = await fetch(`${BASE_URL}/api/auth/send-otp`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: testPhone,
-          uid: testUid,
-          name: 'Dinesh Kumar R'
-        })
+        body: JSON.stringify({ phone: realTestPhone })
       });
-      assert.strictEqual(res.status, 200);
+      assert.strictEqual(sendRes.status, 200);
+
+      const { otpDAO } = require('../server/db');
+      const rec = otpDAO.findLatestPending(realTestPhone);
+      assert.ok(rec, 'Fresh OTP must be pending for the second login');
+
+      const verRes = await fetch(`${BASE_URL}/api/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: realTestPhone, otp: rec.code })
+      });
+      assert.strictEqual(verRes.status, 200);
+      const verData = await verRes.json();
+      assert.strictEqual(verData.success, true);
+      assert.strictEqual(verData.user.id, testUserId, 'Same phone must map to the same account');
+      assert.strictEqual(verData.user.phone_number, realTestPhone);
+    })();
+
+    // 2d. Refresh endpoint must safely reject a missing / invalid refresh token
+    await test('POST /api/auth/refresh rejects a missing refresh token', async () => {
+      const res = await fetch(`${BASE_URL}/api/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      });
+      assert.strictEqual(res.status, 400);
       const data = await res.json();
-      assert.strictEqual(data.success, true);
-      assert.strictEqual(data.user.id, testUserId);
-      assert.strictEqual(data.user.phone_number, testPhone);
+      assert.strictEqual(data.success, false);
     })();
 
     // 5. Protected Route Guard (401 without Token)
@@ -185,7 +193,7 @@ async function runTests() {
       const data = await res.json();
       assert.strictEqual(data.success, true);
       assert.strictEqual(data.user.id, testUserId);
-      assert.strictEqual(data.user.phone_number, testPhone);
+      assert.strictEqual(data.user.phone_number, realTestPhone);
     })();
 
     // 8. Profile Update Operation

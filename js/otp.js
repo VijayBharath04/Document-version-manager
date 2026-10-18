@@ -4,20 +4,18 @@
  */
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const tempMobile = localStorage.getItem('dvm_temp_mobile') || sessionStorage.getItem('dvm_phone') || '9876543210';
+  const tempMobile = localStorage.getItem('dvm_temp_mobile') || sessionStorage.getItem('dvm_phone') || '';
   const maskedMobileEl = document.getElementById('maskedMobile');
   if (maskedMobileEl) {
     const digits = tempMobile.replace(/\D/g, '');
     const last4 = digits.slice(-4);
-    maskedMobileEl.textContent = `+91 ******${last4}`;
+    maskedMobileEl.textContent = last4 ? `+91 ******${last4}` : '+91 ******XXXX';
   }
 
-  // Pre-initialize Auth
-  if (window.DVM_AUTH) {
-    try {
-      await DVM_AUTH.init();
-      DVM_AUTH.initRecaptcha('recaptcha-container');
-    } catch (_) {}
+  // Redirect to login if no phone in session
+  if (!tempMobile) {
+    window.location.href = 'login.html';
+    return;
   }
 
   const otpInputs = document.querySelectorAll('.otp-box');
@@ -198,13 +196,16 @@ document.addEventListener('DOMContentLoaded', async () => {
       e.preventDefault();
       const originalHtml = resendBtn.innerHTML;
       try {
+        resendBtn.disabled = true;
         resendBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin me-1"></i> Sending...';
-        await DVM_AUTH.resendOtp('recaptcha-container');
+        await DVM_AUTH.resendOtp();
         DVM.showToast('OTP Dispatched', 'A new verification code has been dispatched via SMS.', 'success');
         startTimer(60);
       } catch (resendErr) {
         console.error('[Resend OTP] Failed:', resendErr);
         DVM.showToast('Resend Failed', resendErr.message || 'Failed to dispatch new OTP.', 'danger');
+      } finally {
+        resendBtn.disabled = false;
         resendBtn.innerHTML = originalHtml;
       }
     });

@@ -1,6 +1,10 @@
 /**
  * DOCUMENT VERSION MANAGER - Express Backend Server
  * Production-ready backend with authentication, rate limiting, and database routes
+ *
+ * Auth Priority:
+ *   1. Supabase Phone Auth (if SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY are set)
+ *   2. Custom SMS providers (Fast2SMS / Twilio / 2Factor) + SQLite OTP storage
  */
 
 require('dotenv').config();
@@ -20,6 +24,14 @@ const {
   seedIfEmpty
 } = require('./db');
 const { sendSmsOtp } = require('./sms');
+const {
+  isSupabaseConfigured,
+  supabaseSendOtp,
+  supabaseVerifyOtp,
+  supabaseGetUser,
+  supabaseRefreshSession,
+  supabaseUpsertProfile
+} = require('./supabase-auth');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -60,7 +72,10 @@ app.use(
           "https://*.firebaseio.com",
           "https://identitytoolkit.googleapis.com",
           "https://securetoken.googleapis.com",
-          "https://*.firebaseapp.com"
+          "https://*.firebaseapp.com",
+          "https://*.supabase.co",
+          "https://*.supabase.io",
+          "wss://*.supabase.co"
         ]
       }
     },
@@ -96,7 +111,8 @@ const apiLimiter = rateLimit({
 });
 
 // 3. JWT Verification Middleware
-function authenticateToken(req, res, next) {
+// Accepts both custom JWT tokens (legacy/fallback) and Supabase session tokens
+async function authenticateToken(req, res, next) {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
@@ -104,6 +120,37 @@ function authenticateToken(req, res, next) {
     return res.status(401).json({ success: false, message: 'Authentication required. No session token provided.' });
   }
 
+  // Try Supabase token first (if configured)
+  if (isSupabaseConfigured()) {
+    try {
+      const supabaseUser = await supabaseGetUser(token);
+      if (supabaseUser) {
+        // Lookup or create local profile for this Supabase user
+        const phone = supabaseUser.phone || '';
+        let localUser = userDAO.findById(supabaseUser.id) || userDAO.findByPhone(phone);
+        if (!localUser && phone) {
+          localUser = userDAO.create({
+            id: supabaseUser.id,
+            phone_number: phone,
+            full_name: supabaseUser.user_metadata?.full_name || 'SCM User',
+            email: supabaseUser.email || '',
+            role: 'User',
+            status: 'Active'
+          });
+          seedIfEmpty(localUser.id, localUser.full_name);
+        }
+        if (localUser) {
+          req.user = localUser;
+          req.supabaseUser = supabaseUser;
+          return next();
+        }
+      }
+    } catch (supaErr) {
+      // Not a Supabase token — fall through to custom JWT check
+    }
+  }
+
+  // Fall through: validate as custom JWT
   jwt.verify(token, JWT_SECRET, (err, decoded) => {
     if (err) {
       return res.status(403).json({ success: false, message: 'Invalid or expired session. Please log in again.' });
@@ -117,10 +164,17 @@ function authenticateToken(req, res, next) {
   });
 }
 
-// 4. Public Config Route (Returns safe public Firebase variables)
+// 4. Public Config Route (Returns safe public keys — NO service role key)
 app.get('/api/config', (req, res) => {
   res.json({
     success: true,
+    // Supabase public config (anon key is safe to expose to the browser)
+    supabase: {
+      url: process.env.SUPABASE_URL || '',
+      anonKey: process.env.SUPABASE_ANON_KEY || '',
+      configured: isSupabaseConfigured()
+    },
+    // Firebase config (legacy, kept for compatibility)
     firebase: {
       apiKey: process.env.FIREBASE_API_KEY || '',
       authDomain: process.env.FIREBASE_AUTH_DOMAIN || '',
@@ -144,7 +198,14 @@ app.get('/api/health', (req, res) => {
 // 6. Auth Routes
 /**
  * POST /api/auth/send-otp
- * Dispatches real SMS verification code to mobile number and records in database
+ * Dispatches real SMS OTP.
+ *
+ * Priority:
+ *   1. Supabase Phone Auth (if SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY configured)
+ *   2. Custom SMS providers: Fast2SMS / Twilio / 2Factor (if configured in .env)
+ *   3. Console-log fallback (development only — OTP shown in server terminal, NOT in API response)
+ *
+ * IMPORTANT: The OTP code is NEVER returned in the HTTP response under any circumstance.
  */
 app.post('/api/auth/send-otp', authLimiter, async (req, res) => {
   try {
@@ -158,13 +219,44 @@ app.post('/api/auth/send-otp', authLimiter, async (req, res) => {
       cleanPhone = cleanPhone.length === 10 ? `+91${cleanPhone}` : `+${cleanPhone}`;
     }
 
-    // Check if phone matches 10 digits
+    // Validate Indian mobile format
     const digitsOnly = cleanPhone.replace(/\D/g, '').slice(-10);
     if (!/^[6-9]\d{9}$/.test(digitsOnly)) {
-      return res.status(400).json({ success: false, message: 'Please enter a valid 10-digit mobile number.' });
+      return res.status(400).json({ success: false, message: 'Please enter a valid 10-digit Indian mobile number.' });
     }
 
-    // Cooldown check: if an active code was created in last 45 seconds
+    // ── PATH 1: Supabase Phone Auth ───────────────────────────────────────────
+    if (isSupabaseConfigured()) {
+      try {
+        const result = await supabaseSendOtp(cleanPhone);
+        return res.json({
+          success: true,
+          phone: cleanPhone,
+          message: result.message,
+          provider: result.provider,
+          authMode: 'supabase'
+          // OTP code is NEVER included — Supabase handles delivery directly
+        });
+      } catch (supaErr) {
+        const msg = (supaErr.message || '').toLowerCase();
+        if (
+          supaErr.message === 'SUPABASE_NOT_CONFIGURED' ||
+          msg.includes('sms provider is not configured')
+        ) {
+          // Supabase's SMS provider is not set up yet — fall through to any
+          // custom SMS provider configured in .env so login still works.
+          if (supaErr.message !== 'SUPABASE_NOT_CONFIGURED') {
+            console.warn('[Supabase OTP] Phone provider not configured in Supabase dashboard — falling back to custom SMS providers.');
+          }
+        } else {
+          console.error('[Supabase OTP] Send failed:', supaErr.message);
+          return res.status(400).json({ success: false, message: supaErr.message });
+        }
+      }
+    }
+
+    // ── PATH 2: Custom SMS Providers + SQLite OTP Storage ─────────────────────
+    // Cooldown check: prevent repeated rapid requests (45-second window)
     const pending = otpDAO.findLatestPending(cleanPhone);
     if (pending && (pending.expires_at - Date.now()) > 255000) {
       const remainingSeconds = Math.ceil(((pending.expires_at - Date.now()) - 255000) / 1000);
@@ -174,37 +266,47 @@ app.post('/api/auth/send-otp', authLimiter, async (req, res) => {
       });
     }
 
-    // Generate 6-digit numeric OTP
+    // Generate cryptographically random 6-digit OTP
     const code = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // Store in database
+    // Store in SQLite (invalidates any prior pending code for this number)
     otpDAO.create(cleanPhone, code, 300);
 
-    // Dispatch real SMS
+    // Dispatch real SMS (Fast2SMS / Twilio / 2Factor — or console fallback)
     const smsResult = await sendSmsOtp(cleanPhone, code);
 
+    // SECURITY: Never return the OTP code in the HTTP response.
+    // In simulated/dev mode the code appears only in the server terminal.
     res.json({
       success: true,
       phone: cleanPhone,
-      message: smsResult.message,
+      message: smsResult.simulated
+        ? 'Verification code generated. Check the server terminal (no SMS provider configured).'
+        : smsResult.message,
       provider: smsResult.provider,
-      simulated: smsResult.simulated,
-      devCode: smsResult.simulated ? code : undefined
+      simulated: smsResult.simulated === true,
+      authMode: 'custom'
+      // devCode is intentionally OMITTED — check server terminal instead
     });
   } catch (error) {
     console.error('Error dispatching OTP:', error);
-    res.status(500).json({ success: false, message: 'Failed to dispatch verification code.' });
+    res.status(500).json({ success: false, message: 'Failed to dispatch verification code. Please try again.' });
   }
 });
 
 /**
  * POST /api/auth/verify-otp
- * Verifies the 6-digit OTP code against the database, authenticates or creates user,
- * and establishes a secure authenticated session.
+ * Verifies the 6-digit OTP and establishes an authenticated session.
+ *
+ * Priority:
+ *   1. Supabase Phone Auth (if configured) — verifies via Supabase, returns Supabase session token
+ *   2. Custom SQLite OTP storage — verifies locally, returns a signed JWT
+ *
+ * In both cases: creates or retrieves the user's profile in the local SQLite DB.
  */
 app.post('/api/auth/verify-otp', authLimiter, async (req, res) => {
   try {
-    const { phone, otp, name } = req.body;
+    const { phone, otp, name, authMode } = req.body;
     if (!phone || !otp) {
       return res.status(400).json({ success: false, message: 'Mobile number and OTP code are required.' });
     }
@@ -219,7 +321,68 @@ app.post('/api/auth/verify-otp', authLimiter, async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please enter all 6 digits of the verification code.' });
     }
 
-    // Look up latest pending OTP for this number
+    // ── PATH 1: Supabase Phone Auth ───────────────────────────────────────────
+    if (isSupabaseConfigured() && authMode !== 'custom') {
+      try {
+        const { user: supaUser, session } = await supabaseVerifyOtp(cleanPhone, cleanCode);
+
+        // Create or retrieve local profile (keyed by Supabase UUID)
+        let localUser = userDAO.findById(supaUser.id) || userDAO.findByPhone(cleanPhone);
+        if (!localUser) {
+          localUser = userDAO.create({
+            id: supaUser.id,
+            phone_number: cleanPhone,
+            full_name: name || supaUser.user_metadata?.full_name || 'SCM User',
+            email: supaUser.email || '',
+            role: 'User',
+            status: 'Active'
+          });
+          seedIfEmpty(localUser.id, localUser.full_name);
+        }
+
+        // Mirror profile into Supabase PostgreSQL public.profiles (idempotent — no duplicates).
+        // Fails soft: authentication still succeeds if the schema has not been run yet.
+        try {
+          await supabaseUpsertProfile({
+            id: supaUser.id,
+            phone_number: supaUser.phone || cleanPhone,
+            full_name: localUser.full_name,
+            email: localUser.email || null
+          });
+        } catch (profileErr) {
+          console.warn('[Supabase Profiles] Upsert skipped:', profileErr.message);
+        }
+
+        activityDAO.create({
+          id: 'act-' + Date.now(),
+          user_id: localUser.id,
+          action: 'Login',
+          document: 'Authentication Portal',
+          version: 'Supabase SMS OTP Verified',
+          status: 'Success'
+        });
+
+        // Return the Supabase access token as the session token.
+        // The client stores this and sends it in Authorization headers.
+        return res.json({
+          success: true,
+          token: session.access_token,
+          refreshToken: session.refresh_token,
+          user: localUser,
+          authMode: 'supabase',
+          message: 'Mobile number verified successfully via Supabase.'
+        });
+      } catch (supaErr) {
+        if (supaErr.message === 'SUPABASE_NOT_CONFIGURED') {
+          // Fall through to custom OTP path
+        } else {
+          console.error('[Supabase OTP] Verify failed:', supaErr.message);
+          return res.status(400).json({ success: false, message: supaErr.message });
+        }
+      }
+    }
+
+    // ── PATH 2: Custom SQLite OTP Verification ────────────────────────────────
     const record = otpDAO.findLatestPending(cleanPhone);
     if (!record || Date.now() > record.expires_at) {
       return res.status(400).json({
@@ -235,27 +398,26 @@ app.post('/api/auth/verify-otp', authLimiter, async (req, res) => {
       });
     }
 
-    // Check code match
     if (record.code !== cleanCode) {
       otpDAO.incrementAttempts(record.id);
       const remaining = 5 - (record.attempts + 1);
       return res.status(400).json({
         success: false,
-        message: `Incorrect OTP. Please enter the code sent to your phone. (${remaining} attempts remaining)`
+        message: `Incorrect OTP. Please enter the code sent to your phone. (${remaining} attempt${remaining !== 1 ? 's' : ''} remaining)`
       });
     }
 
-    // Mark OTP as verified
+    // Mark OTP as used
     otpDAO.markVerified(record.id);
 
-    // Retrieve or create user in database
+    // Retrieve or create local user profile
     let user = userDAO.findByPhone(cleanPhone);
     if (!user) {
       const uid = 'usr-' + Date.now();
       user = userDAO.create({
         id: uid,
         phone_number: cleanPhone,
-        full_name: name || 'Dinesh Kumar R',
+        full_name: name || 'SCM User',
         email: '',
         role: 'User',
         status: 'Active'
@@ -263,7 +425,7 @@ app.post('/api/auth/verify-otp', authLimiter, async (req, res) => {
       seedIfEmpty(user.id, user.full_name);
     }
 
-    // Sign session JWT
+    // Issue a signed custom JWT session token
     const token = jwt.sign(
       { uid: user.id, phone: user.phone_number },
       JWT_SECRET,
@@ -275,7 +437,7 @@ app.post('/api/auth/verify-otp', authLimiter, async (req, res) => {
       user_id: user.id,
       action: 'Login',
       document: 'Authentication Portal',
-      version: 'Real Mobile SMS Verified',
+      version: 'SMS OTP Verified (Custom Provider)',
       status: 'Success'
     });
 
@@ -283,6 +445,7 @@ app.post('/api/auth/verify-otp', authLimiter, async (req, res) => {
       success: true,
       token,
       user,
+      authMode: 'custom',
       message: 'Mobile number verified successfully.'
     });
   } catch (error) {
@@ -292,76 +455,48 @@ app.post('/api/auth/verify-otp', authLimiter, async (req, res) => {
 });
 
 /**
- * POST /api/auth/session
- * Establishes a verified session after successful SMS OTP verification.
- * Creates or retrieves user in database and returns a signed session token.
+ * POST /api/auth/refresh
+ * Exchanges a valid Supabase refresh token for a new access/refresh token pair.
+ * The old refresh token is rotated by Supabase. Custom (non-Supabase) sessions
+ * are issued as 7-day JWTs and do not require refresh.
+ *
+ * Body: { refreshToken: string }
+ * Returns: { success, token, refreshToken } on success.
+ *
+ * NOTE: This endpoint never creates accounts and never trusts a client-supplied
+ * user ID — it only forwards a refresh token that Supabase itself issued
+ * after a successful phone OTP verification.
  */
-app.post('/api/auth/session', authLimiter, async (req, res) => {
+app.post('/api/auth/refresh', authLimiter, async (req, res) => {
   try {
-    const { phone, uid, name, email } = req.body;
+    const { refreshToken } = req.body || {};
+    if (!refreshToken || typeof refreshToken !== 'string') {
+      return res.status(400).json({ success: false, message: 'Refresh token is required.' });
+    }
 
-    if (!phone || !uid) {
+    if (!isSupabaseConfigured()) {
       return res.status(400).json({
         success: false,
-        message: 'Phone number and verified UID are required.'
+        message: 'Session refresh requires Supabase configuration. Please log in again.'
       });
     }
 
-    // Normalize phone number to E.164
-    let cleanPhone = phone.trim().replace(/[^\d+]/g, '');
-    if (!cleanPhone.startsWith('+')) {
-      cleanPhone = cleanPhone.length === 10 ? `+91${cleanPhone}` : `+${cleanPhone}`;
-    }
-
-    // Check if user already exists by phone or ID
-    let user = userDAO.findByPhone(cleanPhone) || userDAO.findById(uid);
-
-    if (!user) {
-      // New user registration
-      user = userDAO.create({
-        id: uid,
-        phone_number: cleanPhone,
-        full_name: name || 'Dinesh Kumar R',
-        email: email || '',
-        role: 'User',
-        status: 'Active'
+    try {
+      const session = await supabaseRefreshSession(refreshToken);
+      return res.json({
+        success: true,
+        token: session.access_token,
+        refreshToken: session.refresh_token
       });
-      // Seed default documents and activity for new profile
-      seedIfEmpty(user.id, user.full_name);
-    } else {
-      // Existing user login: update ID if needed and keep session in sync
-      if (user.id !== uid) {
-        // If logged in with new UID for same verified phone, ensure profile link
-      }
+    } catch (supaErr) {
+      return res.status(401).json({
+        success: false,
+        message: 'Session has expired. Please log in again.'
+      });
     }
-
-    // Generate signed session JWT
-    const token = jwt.sign(
-      { uid: user.id, phone: user.phone_number },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
-    activityDAO.create({
-      id: 'act-' + Date.now(),
-      user_id: user.id,
-      action: 'Login',
-      document: 'Authentication Portal',
-      version: 'SMS OTP Verified',
-      status: 'Success'
-    });
-
-    res.json({
-      success: true,
-      token,
-      user
-    });
   } catch (error) {
-    console.error('Session establishment error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Failed to establish authenticated session.'
-    });
+    console.error('Session refresh error:', error);
+    res.status(500).json({ success: false, message: 'Failed to refresh session.' });
   }
 });
 

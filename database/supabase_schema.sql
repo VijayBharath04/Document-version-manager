@@ -6,7 +6,7 @@
 -- 1. Create profiles table linked to Supabase auth.users
 CREATE TABLE IF NOT EXISTS public.profiles (
   id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  phone_number TEXT NOT NULL UNIQUE,
+  phone_number TEXT UNIQUE,
   full_name TEXT NOT NULL DEFAULT 'SCM User',
   email TEXT,
   role TEXT NOT NULL DEFAULT 'User',
@@ -141,7 +141,7 @@ BEGIN
   INSERT INTO public.profiles (id, phone_number, full_name, email)
   VALUES (
     NEW.id,
-    COALESCE(NEW.phone, ''),
+    NULLIF(COALESCE(NEW.phone, ''), ''),
     COALESCE(NEW.raw_user_meta_data->>'full_name', 'SCM User'),
     NEW.email
   )
@@ -154,3 +154,25 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+-- ==============================================================================
+-- Keep profiles.updated_at current on every UPDATE
+-- ==============================================================================
+CREATE OR REPLACE FUNCTION public.set_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = timezone('utc'::text, now());
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS set_profiles_updated_at ON public.profiles;
+CREATE TRIGGER set_profiles_updated_at
+  BEFORE UPDATE ON public.profiles
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- ==============================================================================
+-- Allow users to update only their own display fields (defense in depth).
+-- id, phone_number and role are managed by the server / trigger.
+-- ==============================================================================
+REVOKE UPDATE (id, phone_number, role) ON public.profiles FROM authenticated;

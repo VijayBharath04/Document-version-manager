@@ -236,7 +236,7 @@ version identification, status accounting, and verification.`
       author: "Dinesh Kumar R",
       size: "1.8 MB",
       description: "Added Admin dashboard and storage audit metrics",
-      content: "Software Requirements Specification:\n1. User Authentication via Mobile & OTP (Demo mode 123456)\n2. Document Upload (PDF, DOCX, TXT, PPT, Images)\n3. Multi-version History Tracking with non-destructive restore\n4. Side-by-side visual diff comparison with metrics\n5. Admin dashboard with storage monitoring"
+      content: "Software Requirements Specification:\n1. User Authentication via Mobile & OTP\n2. Document Upload (PDF, DOCX, TXT, PPT, Images)\n3. Multi-version History Tracking with non-destructive restore\n4. Side-by-side visual diff comparison with metrics\n5. Admin dashboard with storage monitoring"
     }
   ],
   "doc-3": [
@@ -422,6 +422,20 @@ const DVM = {
       window.location.href = 'dashboard.html';
       return false;
     }
+
+    // Validate (and, if needed, refresh) the stored session against the server.
+    // If the session is genuinely invalid, restoreSession clears the token and
+    // we redirect to login. Transient network failures keep the local session.
+    if (requireAuth && logged && window.DVM_AUTH && typeof window.DVM_AUTH.restoreSession === 'function') {
+      window.DVM_AUTH.restoreSession()
+        .then(() => {
+          if (!localStorage.getItem('dvm_session_token')) {
+            window.location.href = 'login.html';
+          }
+        })
+        .catch(() => {});
+    }
+
     return true;
   },
 
