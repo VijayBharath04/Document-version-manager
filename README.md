@@ -2,7 +2,6 @@
 
 A modern, responsive web application for **Software Configuration Management (SCM)**, built to allow users to upload documents, maintain multi-version baselines, compare versions with visual line-by-line diffs, restore previous baselines non-destructively, download document representations, and inspect repository audit logs.
 
-**GitHub Repository:** [https://github.com/dinesh16122006-gif/Document-version-Manager.git](https://github.com/dinesh16122006-gif/Document-version-Manager.git)  
 **Live Netlify Website:** [https://6aa58429940d5033332622fe--dinesh-doc-version-manager.netlify.app](https://6aa58429940d5033332622fe--dinesh-doc-version-manager.netlify.app)
 
 ---
@@ -55,7 +54,7 @@ The user interface follows a modern SaaS dashboard aesthetic (clean white cards,
 - **Notifications Center (`notifications.html`)**:
   - Read/unread states, filter tabs, and "Mark all as read" capability.
 - **Profile Page (`profile.html`)**:
-  - Student profile for **Dinesh Kumar R**, course credentials, mobile mask, and edit modals.
+  - Student profile for **Vijay Bharath G**, course credentials, mobile mask, and edit modals.
 - **Admin Dashboard (`admin.html`)**:
   - System-wide metric cards (Users, Documents, Versions, Storage).
   - User management table with account Enable/Disable toggles.
@@ -222,7 +221,7 @@ git push
 
 ## 🔑 Signing In
 
-- **Mobile Number**: any valid 10-digit Indian number (e.g. `9876543210`).
+- **Mobile Number**: any valid 10-digit Indian number 
 - **OTP**: the 6-digit code actually texted to that phone. There is **no demo code** —
   a verified new number creates an account, and a returning verified number logs in.
 
@@ -252,5 +251,5 @@ git push
 
 ## 📄 License & Attribution
 
-Developed as a college course project for **Software Configuration Management (SCM)** by **Dinesh Kumar R** (2026).
+Developed as a college course project for **Software Configuration Management (SCM)** by **Vijay Bharath G** (2026).
 All rights reserved.
